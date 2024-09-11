@@ -9,6 +9,7 @@ load_dotenv()
 
 os.getenv("GROK_API_KEY")
 
+
 class Chain:
     def __init__(self):
         self.llm = ChatGroq(temperature=0, groq_api_key=os.getenv("GROK_API_KEY"), model_name="llama-3.1-70b-versatile")
@@ -39,24 +40,20 @@ class Chain:
             """
             ### JOB DESCRIPTION:
             {job_description}
-            
+
             ### INSTRUCTION:
-            You are , a Ray, Founder at ChatterSphere. ChatterSphere is an AI & Software Consulting company dedicated to facilitating
-            the seamless integration of business processes through automated tools. 
-            Over our experience, we have empowered numerous enterprises with tailored solutions, fostering scalability, 
-            process optimization, cost reduction, and heightened overall efficiency. 
-            Your job is to write a cold email to the client regarding the job mentioned above describing the capability of AtliQ 
-            in fulfilling their needs.
-            Also add the most relevant ones from the following links to showcase ChatterSphere's portfolio: {link_list}
-            Remember you are Ray, Founder at ChatterSphere. 
+            You are an individual looking to apply for the job mentioned above. 
+            Write a personalized cold email to the employer describing how your skills and experience align with their job posting. 
+            Add any links or portfolio items from the following list to strengthen your application: {link_list}.
+            Remember to be professional and concise. 
             Do not provide a preamble.
             ### EMAIL (NO PREAMBLE):
-
             """
         )
         chain_email = prompt_email | self.llm
         res = chain_email.invoke({"job_description": str(job), "link_list": links})
         return res.content
+
 
 if __name__ == "__main__":
     print(os.getenv("GROK_API_KEY"))
