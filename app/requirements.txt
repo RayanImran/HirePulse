@@ -8,3 +8,4 @@ pandas
 python-dotenv
 uuid
 PyPDF2
+beautifulsoup4
