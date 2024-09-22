@@ -7,4 +7,4 @@ chromadb == 0.5.3
 pandas
 python-dotenv
 uuid
-
+PyPDF2
