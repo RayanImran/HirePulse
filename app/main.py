@@ -1,9 +1,10 @@
+# app.py or main.py
 import streamlit as st
 from langchain_community.document_loaders import WebBaseLoader
-from PyPDF2 import PdfReader  # Import for PDF text extraction
+from PyPDF2 import PdfReader
 from chains import Chain
 from portfolio import Portfolio
-from utils import clean_text
+from utils import clean_text, extract_text_from_pdf
 
 def extract_text_from_pdf(pdf_file):
     reader = PdfReader(pdf_file)
@@ -12,53 +13,104 @@ def extract_text_from_pdf(pdf_file):
         text += page.extract_text()
     return text
 
-def create_streamlit_app(llm, portfolio, clean_text):
-    st.title("📧 Cold Mail Generator")
+def create_streamlit_app(chain, portfolio, clean_text):
+    st.title("📄 Tailored Resume & ATS Optimizer")
 
-    # Step 3: Add URL input for the job posting
-    url_input = st.text_input("Enter a URL:", value="https://jobs.nike.com/job/R-33460")
+    # URL input for the job posting
+    url_input = st.text_input("Enter a job posting URL:")
 
-    # Step 4: Upload PDF for the resume
-    uploaded_file = st.file_uploader("Upload a PDF resume", type=["pdf"])
+    # Upload PDF resume
+    uploaded_file = st.file_uploader("Upload your resume (PDF):", type=["pdf"])
 
-    if uploaded_file is not None:
-        resume_content = extract_text_from_pdf(uploaded_file)  # Extract the text from the PDF
-        st.success("PDF file has been uploaded and processed!")
-    else:
-        st.warning("Please upload a PDF resume.")
-
-    # Step 5: Submit button to trigger the process
+    # Submit button
     submit_button = st.button("Submit")
 
     if submit_button:
-        try:
-            # Load and clean the job description from the provided URL
+        if url_input and uploaded_file is not None:
+            # Extract resume content
+            resume_content = extract_text_from_pdf(uploaded_file)
+            st.success("Resume uploaded and extracted successfully!")
+
+            # Load and clean job description from the provided URL
             loader = WebBaseLoader([url_input])
-            data = clean_text(loader.load().pop().page_content)
+            data = loader.load()
+            if data:
+                job_description_raw = data[0].page_content
+                job_description = clean_text(job_description_raw)
 
-            # Load portfolio
-            portfolio.load_portfolio()
+                # Extract jobs from the scraped content
+                jobs = chain.extract_jobs(job_description)
 
-            # Extract jobs from the scraped content
-            jobs = llm.extract_jobs(data)
+                if jobs:
+                    # Assuming only one job for simplicity
+                    job = jobs[0]
+                    st.success("Job description loaded successfully!")
 
-            for job in jobs:
-                # Step 6: Match resume content with job description
-                matched_resume = llm.match_resume(job['description'], resume_content)
+                    # Store variables in st.session_state
+                    st.session_state.resume_content = resume_content
+                    st.session_state.job_description = job['description']
+                    st.session_state.job = job
 
-                # Query portfolio for relevant links based on job skills
-                skills = job.get('skills', [])
-                links = portfolio.query_links(skills)
+                else:
+                    st.error("No job postings found in the provided URL.")
+                    return
+            else:
+                st.error("Failed to load job description from the URL.")
+                return
+        else:
+            st.error("Please provide both a job posting URL and upload your resume.")
+            return
 
-                # Generate the cold email based on the job and matched resume
-                email = llm.write_mail(job, links, matched_resume)
-                st.code(email, language='markdown')
+    # Proceed if resume_content and job_description are available
+    if 'resume_content' in st.session_state and 'job_description' in st.session_state:
+        # Display job description
+        st.subheader("Job Description")
+        st.write(st.session_state.job_description)
 
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
+        # Editable resume content
+        st.subheader("Edit Your Resume Content:")
+        resume_content = st.text_area("Resume Content", value=st.session_state.resume_content, height=300)
+
+        # Real-Time ATS Score
+        ats_score, job_keywords = chain.calculate_ats_score(resume_content, st.session_state.job_description)
+        st.subheader(f"ATS Match Score: {ats_score}%")
+
+        # Display keywords
+        st.write("**Job Keywords:**", ', '.join(job_keywords))
+
+        # Generate real-time suggestions
+        suggestions = chain.get_real_time_suggestions(resume_content, st.session_state.job_description)
+
+        st.subheader("Actionable Suggestions")
+        if suggestions:
+            for suggestion in suggestions:
+                st.markdown(f"- **Original Text:** {suggestion['Original Text']}")
+                st.markdown(f"  **Suggested Improvement:** {suggestion['Suggested Improvement']}")
+                st.markdown(f"  **Reason:** {suggestion['Reason']}")
+        else:
+            st.write("No suggestions at this time.")
+
+        # Option to generate the tailored resume
+        if st.button("Generate Tailored Resume"):
+            tailored_resume = chain.generate_tuned_resume(resume_content, st.session_state.job_description)
+            st.subheader("Tailored Resume")
+            st.text_area("Updated Resume Content", tailored_resume, height=300)
+
+        # Option to generate the cold email
+        if st.button("Generate Cold Email"):
+            matched_resume = chain.match_resume(st.session_state.job_description, resume_content)
+            skills = st.session_state.job.get('skills', [])
+            links = portfolio.query_links(skills)
+            email = chain.write_mail(st.session_state.job, links, matched_resume)
+            st.subheader("Generated Cold Email")
+            st.code(email, language='markdown')
+
+    else:
+        st.info("Please provide both a job posting URL and upload your resume, then click Submit.")
 
 if __name__ == "__main__":
     chain = Chain()
     portfolio = Portfolio()
-    st.set_page_config(layout="wide", page_title="Cold Email Generator", page_icon="📧")
+    portfolio.load_portfolio()
+    st.set_page_config(layout="wide", page_title="Resume Optimizer", page_icon="📄")
     create_streamlit_app(chain, portfolio, clean_text)

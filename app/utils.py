@@ -14,3 +14,11 @@ def clean_text(text):
     # Remove extra whitespace
     text = ' '.join(text.split())
     return text
+
+
+def extract_text_from_pdf(uploaded_file):
+    reader = PdfReader(uploaded_file)
+    text = ''
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
