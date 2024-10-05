@@ -7,6 +7,11 @@ chromadb == 0.5.3
 pandas
 python-dotenv
 uuid
+<<<<<<< HEAD
 bs4
 
 
+=======
+PyPDF2
+beautifulsoup4
+>>>>>>> DevDeployment

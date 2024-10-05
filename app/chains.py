@@ -35,15 +35,44 @@ class Chain:
             raise OutputParserException("Context too big. Unable to parse jobs.")
         return res if isinstance(res, list) else [res]
 
-    def write_mail(self, job, links):
+    def match_resume(self, job_description, resume_content):
+        prompt_match = PromptTemplate.from_template(
+            """
+            ### JOB DESCRIPTION:
+            {job_description}
+
+            ### RESUME CONTENT:
+            {resume_content}
+
+            ### INSTRUCTION:
+            Compare the job description to the resume content. Extract and highlight key matching experiences and skills that align with the job description.
+            Return the comparison in a concise bullet point format.
+            ### MATCHED SUMMARY (NO PREAMBLE):
+            """
+        )
+        chain_match = prompt_match | self.llm
+        res = chain_match.invoke({"job_description": job_description, "resume_content": resume_content})
+        return res.content
+
+    def write_mail(self, job, links, matched_resume):
         prompt_email = PromptTemplate.from_template(
             """
             ### JOB DESCRIPTION:
             {job_description}
 
+<<<<<<< HEAD
             ### INSTRUCTION:
             You are an individual looking to apply for the job mentioned above. 
             Write a personalized cold email to the employer describing how your skills and experience align with their job posting. 
+=======
+            ### MATCHED RESUME SUMMARY:
+            {matched_resume}
+
+            ### INSTRUCTION:
+            You are an individual looking to apply for the job mentioned above. 
+            Write a personalized cold email to the employer describing how your skills and experience align with their job posting, 
+            referencing the matched resume summary where appropriate. 
+>>>>>>> DevDeployment
             Add any links or portfolio items from the following list to strengthen your application: {link_list}.
             Remember to be professional and concise. 
             Do not provide a preamble.
@@ -51,7 +80,7 @@ class Chain:
             """
         )
         chain_email = prompt_email | self.llm
-        res = chain_email.invoke({"job_description": str(job), "link_list": links})
+        res = chain_email.invoke({"job_description": str(job), "link_list": links, "matched_resume": matched_resume})
         return res.content
 
 
